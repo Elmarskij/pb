@@ -1,9 +1,9 @@
 # main_script.py
 import logging
-import re
 
 from com.powerball.main.app.combinations_generator import CombinationsGenerator
 from com.powerball.main.rest.lotto_net import LottoNetAPI
+from com.powerball.main.utility.common_utilities import CommonUtilities
 
 # To enable logging for all levels, set the level to DEBUG and define the format.
 logging.basicConfig(
@@ -23,20 +23,30 @@ def generate_combinations():
     CombinationsGenerator.generate_combinations(numbers_pool, extras_pool)
 
 
-def get_results_for_year(year: int):
-    """
-    Makes an API call to lotto.net for a specific year's results and returns the response as a string.
-    """
+def get_results_for_year(year: int) -> list[list[int]]:
+    """ Fetch annual draw results """
     try:
         response: str = LottoNetAPI.get_results_for_year(year)
-        logging.info(f"Results for year {year}: {re.sub(r'\s+', '', response)}")
+        annual_number_2025: list[list[int]] = CommonUtilities.fetch_annual_draw_result(response)
+        return annual_number_2025
     except Exception as e:
         logging.error(f"An error occurred while fetching results for {year}: {e}")
+        return [[]]
+
+def get_results() -> dict[int, list[list[int]]]:
+    """ Fetch all results """
+    results: dict[int, list[list[int]]] = {}
+    for i in range(2025, 2015 - 1, -1):
+        results[i] = get_results_for_year(i)
+    return results
 
 
 def main():
-    generate_combinations()
-    get_results_for_year(2025)
+    # generate_combinations()
+    # get_results_for_year(2025)
+    results: dict[int, list[list[int]]] = get_results()
+    logging.info(f"Results: {results}")
+    logging.info(f"Length of results: {len(results)}")
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 # lotto_net.py
 import logging
+import re
 from typing import Final
 import requests
 from requests import Response
@@ -29,7 +30,7 @@ class LottoNetAPI:
             response: Response = requests.get(url, headers=cls._HEADERS)
             response.raise_for_status()  # Raise an exception for HTTP errors
             logging.info(f"Successfully retrieved data from {url}")
-            return response.text
+            return re.sub(r'\s+', '', response.text)
         except requests.exceptions.RequestException as e:
             logging.error(f"Error making API call to {url}: {e}")
             return ""
