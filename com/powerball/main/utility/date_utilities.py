@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, date
 import pytz
 
 
-class LotteryDateCalculator:
+class DateUtilities:
     """
     Determines the next valid lottery draw date (Mon, Wed, Sat)
     considering a 9 PM CST cut-off time.
