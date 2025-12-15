@@ -1,4 +1,4 @@
-# combinations_generator.py
+# combinations_utilities.py
 import itertools
 from datetime import date
 
@@ -6,16 +6,16 @@ import pandas as pd
 from pandas import DataFrame
 
 # Import the helper classes
-from .date_utilities import LotteryDateCalculator
+from .date_utilities import DateUtilities
 from .csv_utilities import CSVUtilities
 
 
-class CombinationsGenerator:
+class CombinationsUtilities:
     """
     Generates lottery number combinations and coordinates saving them to a CSV file.
     """
 
-    def __init__(self, numbers: list, extras: list) -> None:
+    def __init__(self, numbers: list[int], extras: list[int]) -> None:
         self.numbers: list[int] = numbers
         self.extras: list[int] = extras
         self.target_date_obj = None
@@ -27,8 +27,8 @@ class CombinationsGenerator:
 
     def _set_target_date(self) -> None:
         """Uses the helper class to determine and format the target date."""
-        date_calc = LotteryDateCalculator()
-        self.target_date_obj: date = date_calc.get_target_date()
+        date_utils = DateUtilities()
+        self.target_date_obj: date = date_utils.get_target_date()
         self.formatted_date: str = self.target_date_obj.strftime("%m-%d-%Y")
 
     def generate_dataframe(self) -> DataFrame:
