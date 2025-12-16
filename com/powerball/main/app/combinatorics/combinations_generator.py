@@ -1,5 +1,5 @@
 # main_script.py
-from ..utility.combinations_utilities import CombinationsUtilities
+from com.powerball.main.utility.combinations_utilities import CombinationsUtilities
 
 class CombinationsGenerator:
 

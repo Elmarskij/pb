@@ -1,9 +1,11 @@
 # main_script.py
 import logging
+import streamlit as st
 
-from com.powerball.main.app.combinations_generator import CombinationsGenerator
+from com.powerball.main.app.combinatorics.combinations_generator import CombinationsGenerator
 from com.powerball.main.rest.lotto_net import LottoNetAPI
 from com.powerball.main.utility.common_utilities import CommonUtilities
+from com.powerball.main.app.charts.frequency_bar import run_dashboard, FrequencyChartGenerator
 
 # Configure logging to provide detailed output, including timestamps and file context.
 logging.basicConfig(
@@ -18,6 +20,8 @@ def generate_combinations():
     # Define the input data pools here
     numbers_pool = [10, 21, 23, 28, 32, 33, 39, 61, 62, 63, 64, 69]
     extras_pool = [4, 18, 21, 24]
+
+    CombinationsGenerator.generate_combinations(numbers_pool, extras_pool)
 
 def fetch_and_parse_yearly_results(year: int) -> list[dict[str, list[int]]]:
     """
@@ -55,17 +59,39 @@ def fetch_all_historical_results() -> dict[int, list[list[int]]]:
         all_results[year] = fetch_and_parse_yearly_results(year)
     return all_results
 
+def generate_general_frequency_chart(input_data: dict[int, list[list[int]]]) -> None:
+    # 1. Instantiate the generator class with your data
+    chart_gen = FrequencyChartGenerator(input_data)
+
+    # 2. Generate the chart for the "Main Numbers" (First 5 balls)
+    chart_gen.plot(plot_type='main')
+
+    # 3. Generate the chart for the "Special Ball" (The 6th ball)
+    chart_gen.plot(plot_type='special')
+
+@st.cache_data
+def get_cached_historical_data():
+    """
+    Wraps the API call with caching.
+    Streamlit will run this ONCE, store the result,
+    and just return the result instantly on subsequent runs.
+    """
+    logging.info("cache miss: Fetching fresh data from API...")
+    return fetch_all_historical_results()
+
 def main():
     """The main entry point of the script."""
     logging.info("Starting the Powerball results fetching process.")
     
-    historical_data = fetch_all_historical_results()
+    historical_data = get_cached_historical_data()
     
     logging.info(f"Successfully fetched results for {len(historical_data)} years.")
     # Example of how to access and print the results for a specific year.
     if 2025 in historical_data:
         logging.info(f"First 5 results for 2025: {historical_data[2025][:5]}")
-    logging.info(f"Results: {historical_data}")
+    # logging.info(f"Results: {historical_data}")
+
+    run_dashboard(historical_data)
 
 if __name__ == "__main__":
     main()
