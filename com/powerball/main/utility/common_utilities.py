@@ -1,80 +1,163 @@
-#common_utilities.py
+# common_utilities.py
 import logging
 import re
+from typing import Optional
 
 import dateparser
 
 
 class CommonUtilities:
+    """A utility class for parsing lottery draw results from HTML content."""
+
+    _properties: Optional[dict[str, str]] = None
 
     @classmethod
-    def fetch_annual_draw_result(cls, dom: str) -> list[list[int]]:
-        logging.info("Fetching draw_numbers from the provided HTML content.")
+    def parse_annual_results(cls, dom: str, year: int) -> list[dict[str, list[int]]]:
+        """
+        Parses the HTML content for a given year to extract all lottery draw results.
 
-        annual_number = []
-        annual_raw_draw_details: list[str] = CommonUtilities._fetch_raw_annual_draw_results(dom)
+        Args:
+            dom: The HTML content string for a full year's lottery results.
+            year: The year being parsed, used for special date handling.
 
-        for annual_raw_draw_detail in annual_raw_draw_details:
-            daily_draw_detail: dict[str, list[int]] = CommonUtilities._fetch_daily_draw_results(annual_raw_draw_detail)
-            annual_number.append(daily_draw_detail)
+        Returns:
+            A list of lists, where each inner list contains the numbers for a single draw.
+        """
+        logging.info(f"Parsing lottery results for the year {year} from the provided HTML content.")
 
-        return annual_number
+        all_draws_html = cls._extract_all_draws_html(dom)
+        
+        parsed_draws = []
+        for draw_html in all_draws_html:
+            # This hardcoded date is to handle a known format change on the website for older results.
+            draw_date_str = cls._extract_date_from_draw_html(draw_html)
+            if year == 2015 and draw_date_str == '10-03-2015':
+                logging.warning("Stopping parsing for 2015 before 10-03-2015 due to a rule change in 10-07-2025")
+                break
+
+            raw_numbers_html = cls._extract_raw_numbers_from_draw_html(draw_html)
+            numbers = cls._parse_numbers_from_html_spans(raw_numbers_html)
+            if numbers:
+                parsed_draws.append({draw_date_str: numbers})
+        
+        return parsed_draws
 
     @classmethod
     def _convert_russian_date(cls, russian_date: str) -> str:
+        """
+        Converts a date string in Russian to a standard 'MM-DD-YYYY' format.
+
+        Args:
+            russian_date: The date string, potentially in Russian.
+
+        Returns:
+            The formatted date string.
+        """
         return dateparser.parse(russian_date).date().strftime("%m-%d-%Y")
 
     @classmethod
-    def _fetch_raw_annual_draw_results(cls, data: str) -> list[str]:
-        # Pattern to find annual draw results in the DOM
-        pattern = CommonUtilities.get_from_config("annual_draw_pattern")
-        # Find all annual draw details
-        return re.findall(pattern, data)
+    def _extract_all_draws_html(cls, dom: str) -> list[str]:
+        """
+        Extracts HTML segments for each individual draw from the annual HTML content.
+
+        Args:
+            dom: The complete HTML content for a year.
+
+        Returns:
+            A list of HTML strings, each corresponding to a single draw.
+        """
+        pattern = cls.get_from_config("annual_draw_pattern")
+        return re.findall(pattern, dom)
 
     @classmethod
-    def _fetch_daily_draw_results(cls, data: str) -> dict[str, list[int]]:
-        # Pattern to find daily draw results in the DOM
-        ball_pattern: str = CommonUtilities.get_from_config("daily_draw_pattern")
-        # Find all daily draw numbers
-        daily_raw_draw_numbers: list[str] = re.findall(ball_pattern, data)
-        # Pop last element (PowerPlay)
-        daily_raw_draw_numbers.pop()
-        # Store daily draw numbers in the list
-        daily_draw_numbers: list[int] = [int(number.replace('<span>', '').replace('</span>', '')) for number in daily_raw_draw_numbers]
+    def _extract_raw_numbers_from_draw_html(cls, draw_html: str) -> list[str]:
+        """
+        Extracts the raw HTML for the winning numbers from a single draw's HTML.
 
-        # Pattern to find draw date
-        draw_date_pattern: str = CommonUtilities.get_from_config("draw_date_pattern")
-        # Find draw date
-        draw_date: str = re.search(draw_date_pattern, data).group().replace('</span>', '').replace('</div>', '')
+        Args:
+            draw_html: The HTML content for a single draw.
 
-        return {CommonUtilities._convert_russian_date(draw_date): daily_draw_numbers}
+        Returns:
+            A list of raw HTML strings for each number. The 'PowerPlay' number is excluded.
+        """
+        ball_pattern = cls.get_from_config("daily_draw_pattern")
+        raw_numbers = re.findall(ball_pattern, draw_html)
+        
+        # The last number found is the 'PowerPlay' multiplier, which is not a winning number.
+        if raw_numbers:
+            raw_numbers.pop()
+
+        return raw_numbers
+
+    @classmethod
+    def _parse_numbers_from_html_spans(cls, raw_numbers_html: list[str]) -> list[int]:
+        """
+        Parses a list of raw HTML number spans into a list of integers.
+
+        Args:
+            raw_numbers_html: A list of HTML strings, e.g., ['<span>10</span>', '<span>20</span>'].
+
+        Returns:
+            A list of the extracted numbers as integers.
+        """
+        # This list comprehension is a fast way to clean the HTML tags and convert to int.
+        return [int(span.replace('<span>', '').replace('</span>', '')) for span in raw_numbers_html]
+
+    @classmethod
+    def _extract_date_from_draw_html(cls, draw_html: str) -> str:
+        """
+        Extracts and formats the draw date from a single draw's HTML content.
+
+        Args:
+            draw_html: The HTML content for a single draw.
+
+        Returns:
+            The formatted date string ('MM-DD-YYYY').
+        """
+        draw_date_pattern = cls.get_from_config("draw_date_pattern")
+        match = re.search(draw_date_pattern, draw_html)
+        if not match:
+            return ""
+            
+        raw_date = match.group().replace('</span>', '').replace('</div>', '')
+        return cls._convert_russian_date(raw_date)
 
     @staticmethod
-    def get_from_config(key: str) -> str:
-        return CommonUtilities._load_properties().get(key)
+    def get_from_config(key: str) -> Optional[str]:
+        """
+        Retrieves a configuration value for a given key from 'config.properties'.
+        The properties are cached after the first read to improve performance.
+
+        Args:
+            key: The configuration key to look up.
+
+        Returns:
+            The configuration value as a string, or None if not found.
+        """
+        if CommonUtilities._properties is None:
+            logging.info("Loading properties from config.properties for the first time.")
+            CommonUtilities._properties = CommonUtilities._load_properties()
+        return CommonUtilities._properties.get(key)
 
     @staticmethod
     def _load_properties() -> dict[str, str]:
         """
-        Reads a properties file and returns a dictionary.
-        :return: dict[str, str]
+        Reads the 'config.properties' file and returns its contents as a dictionary.
+
+        Returns:
+            A dictionary containing the key-value pairs from the properties file.
         """
-        filepath: str = "config.properties"
-        properties: dict[str, str] = {}
+        filepath = "config.properties"
+        properties = {}
         try:
             with open(filepath, "rt") as f:
                 for line in f:
-                    l = line.strip()
-                    # Skip empty lines and comments
-                    if l and not l.startswith('#'):
-                        # Split only on the first occurrence of the separator
-                        key_value = l.split('=', 1)
+                    line = line.strip()
+                    if line and not line.startswith('#'):
+                        key_value = line.split('=', 1)
                         if len(key_value) == 2:
-                            key = key_value[0].strip()
-                            value = key_value[1].strip()
-                            properties[key] = value
+                            properties[key_value[0].strip()] = key_value[1].strip()
         except FileNotFoundError:
-            print(f"Error: The file {filepath} was not found.")
+            logging.error(f"Configuration file not found: {filepath}")
             return {}
-
         return properties
