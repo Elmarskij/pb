@@ -161,3 +161,15 @@ class CommonUtilities:
             logging.error(f"Configuration file not found: {filepath}")
             return {}
         return properties
+
+    @classmethod
+    def get_chart_dpi(cls):
+        """
+        Retrieves 'chart_dpi' from config.
+        Returns 300 (High Res) if the key is missing or invalid.
+        """
+        try:
+            val = cls.get_from_config("chart_dpi")
+            return int(val) if val else 300
+        except Exception:
+            return 300

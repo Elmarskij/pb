@@ -2,6 +2,8 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from com.powerball.main.utility.common_utilities import CommonUtilities
+
 
 class LotteryChartBase:
     def __init__(self, data, start_date=None, end_date=None, chart_name="Chart"):
@@ -45,7 +47,7 @@ class LotteryChartBase:
         """
         SHARED: The plotting logic.
         """
-        fig, ax = plt.subplots(figsize=figsize)
+        fig, ax = plt.subplots(figsize=figsize, dpi=CommonUtilities.get_chart_dpi())
 
         if not data_list:
             ax.text(0.5, 0.5, "No data found in range", ha='center', va='center')
