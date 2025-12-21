@@ -61,10 +61,10 @@ class LotteryChartBase:
         s_txt = self.start_date.strftime('%m-%d-%Y') if self.start_date != datetime.min else "Start"
         e_txt = self.end_date.strftime('%m-%d-%Y') if self.end_date != datetime.max else "End"
 
-        ax.set_title(f"{self.chart_name} ({title_suffix})\nRange: {s_txt} to {e_txt}")
-        ax.set_xlabel("Ball Number")
-        ax.set_ylabel("Frequency")
-        ax.grid(axis='y', linestyle='--', alpha=0.7)
+        ax.set_title(f"{self.chart_name} ({title_suffix})", fontsize=11)
+        ax.set_xlabel("Ball Number", fontsize=8)
+        ax.set_ylabel("Frequency", fontsize=8)
+        ax.grid(axis='y', linestyle='--', alpha=0.7, linewidth=0.5)
         ax.set_xticks(counts.index)
 
         # Optimize tick labels based on chart size
