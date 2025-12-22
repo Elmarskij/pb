@@ -12,13 +12,11 @@ class FrequencyChartGenerator(LotteryChartBase):
     def extract_numbers_from_df(self):
         """
         OPTIMIZED: Grab columns directly.
-        Pandas 'melt' or 'stack' is faster than loops.
         """
         if self.filtered_df.empty:
             return
 
         # 1. Main Numbers: Columns n1 through n5
-        # We flatten them into a single list
         main_cols = ['n1', 'n2', 'n3', 'n4', 'n5']
         self.main_numbers = self.filtered_df[main_cols].values.flatten().tolist()
 

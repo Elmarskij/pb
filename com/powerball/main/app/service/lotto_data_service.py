@@ -1,6 +1,6 @@
 import logging
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 from com.powerball.main.rest.lotto_net import LottoNetAPI
 from com.powerball.main.utility.common_utilities import CommonUtilities
 
@@ -27,6 +27,25 @@ class LottoDataService:
             logging.error(f"Critical error fetching/parsing results for {year}: {e}", exc_info=True)
             return []
 
+    @staticmethod
+    def _get_latest_draw_year() -> int:
+        """
+        Calculates the year of the most recent lottery draw (Mon, Wed, Sat).
+        This prevents fetching a future year (which returns 404) if the year has
+        changed but the first game hasn't happened yet.
+        """
+        now = datetime.now()
+        # Monday=0, Wednesday=2, Saturday=5
+        draw_days = [0, 2, 5]
+
+        # Look back up to 7 days to find the last draw date
+        for i in range(0, 7):
+            check_date = now - timedelta(days=i)
+            if check_date.weekday() in draw_days:
+                return check_date.year
+
+        return now.year  # Fallback
+
     @classmethod
     def fetch_all_historical_results(cls) -> pd.DataFrame:
         """
@@ -35,11 +54,14 @@ class LottoDataService:
         """
         all_draws = []
 
-        # 1. Fetch Loop
-        for year in range(2025, 2014, -1):
+        # Determine start year based on the last actual draw
+        start_year = cls._get_latest_draw_year()
+
+        # Fetch from latest draw year down to 2014
+        for year in range(start_year, 2014, -1):
             year_data = cls.fetch_and_parse_yearly_results(year)
 
-            # 2. Flatten the structure immediately
+            # Flatten the structure immediately
             for draw_record in year_data:
                 for date_str, numbers in draw_record.items():
                     # Parse date ONCE here
@@ -57,12 +79,15 @@ class LottoDataService:
                     except ValueError:
                         continue
 
-        # 3. Create DataFrame
+        # Create DataFrame
         df = pd.DataFrame(all_draws)
 
-        # Sort by date for safety
         if not df.empty:
             df = df.sort_values(by='Date', ascending=False)
+
+            # --- DATE FILTER ---
+            # Strictly filter out any future dates (placeholders from website)
+            df = df[df['Date'] <= datetime.now()]
 
         logging.info(f"Converted {len(df)} rows into DataFrame.")
         return df

@@ -13,7 +13,6 @@ class IndividualFrequencyChartGenerator(LotteryChartBase):
             return
 
         # Map DataFrame columns to Position Index 0-5
-        # 0->n1, 1->n2 ... 4->n5, 5->pb
         col_map = {0: 'n1', 1: 'n2', 2: 'n3', 3: 'n4', 4: 'n5', 5: 'pb'}
 
         for i in range(6):

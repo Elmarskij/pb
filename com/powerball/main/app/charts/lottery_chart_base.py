@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, date
 from com.powerball.main.utility.common_utilities import CommonUtilities
 
 
@@ -10,31 +10,42 @@ class LotteryChartBase:
         self.chart_name = chart_name
         self.filtered_df = pd.DataFrame()  # Will hold cut data
 
-        # Parse filter dates
+        # Parse filter dates - ROBUST HANDLING
+        # Handles both strings (from legacy code) and date objects (from new slider)
         if start_date:
-            self.start_date = datetime.strptime(start_date, "%m-%d-%Y")
+            if isinstance(start_date, (datetime, date)):
+                self.start_date = pd.to_datetime(start_date)
+            else:
+                self.start_date = datetime.strptime(str(start_date), "%m-%d-%Y")
         else:
-            self.start_date = datetime.min
+            self.start_date = pd.to_datetime(datetime.min)
 
         if end_date:
-            self.end_date = datetime.strptime(end_date, "%m-%d-%Y")
+            if isinstance(end_date, (datetime, date)):
+                self.end_date = pd.to_datetime(end_date)
+            else:
+                self.end_date = datetime.strptime(str(end_date), "%m-%d-%Y")
         else:
-            self.end_date = datetime.max
+            self.end_date = pd.to_datetime(datetime.max)
 
         self.process_data()
 
     def process_data(self):
         """
-        OPTIMIZED: Uses Vectorized Pandas Filtering (No loops!)
+        OPTIMIZED: Uses Vectorized Pandas Filtering.
         """
         if self.df_data.empty:
             return
 
-        # 1. Instant Date Filter
+        # Ensure 'Date' column is datetime
+        if not pd.api.types.is_datetime64_any_dtype(self.df_data['Date']):
+             self.df_data['Date'] = pd.to_datetime(self.df_data['Date'])
+
+        # Filter
         mask = (self.df_data['Date'] >= self.start_date) & (self.df_data['Date'] <= self.end_date)
         self.filtered_df = self.df_data.loc[mask]
 
-        # 2. Trigger extraction hook (child classes will define this)
+        # Trigger extraction hook
         self.extract_numbers_from_df()
 
     def extract_numbers_from_df(self):
@@ -42,8 +53,6 @@ class LotteryChartBase:
         raise NotImplementedError("Child classes must implement extract_numbers_from_df")
 
     def generate_plot(self, data_list, title_suffix, color, figsize=(6, 4)):
-        # ... (This method remains EXACTLY the same as before) ...
-        # (Just copy your existing generate_plot logic here)
         current_dpi = CommonUtilities.get_chart_dpi()
         fig, ax = plt.subplots(figsize=figsize, dpi=current_dpi)
 
