@@ -4,18 +4,24 @@ from com.powerball.main.utility.dashboard_utilities import render_chart_in_colum
 
 
 class IndividualFrequencyChartGenerator(LotteryChartBase):
-    def __init__(self, data, start_date=None, end_date=None, chart_name="Positions"):
+    def __init__(self, df_data, start_date=None, end_date=None, chart_name="Positions"):
         self.positions = {i: [] for i in range(6)}
-        super().__init__(data, start_date, end_date, chart_name)
+        super().__init__(df_data, start_date, end_date, chart_name)
 
-    def extract_numbers(self, numbers):
+    def extract_numbers_from_df(self):
+        if self.filtered_df.empty:
+            return
+
+        # Map DataFrame columns to Position Index 0-5
+        # 0->n1, 1->n2 ... 4->n5, 5->pb
+        col_map = {0: 'n1', 1: 'n2', 2: 'n3', 3: 'n4', 4: 'n5', 5: 'pb'}
+
         for i in range(6):
-            if i < len(numbers):
-                self.positions[i].append(numbers[i])
+            col_name = col_map[i]
+            self.positions[i] = self.filtered_df[col_name].tolist()
 
     def plot(self, position_index, color='skyblue', figsize=(6, 4)):
         data = self.positions.get(position_index, [])
-        # Titles are 1-based (Space 1, Space 2...)
         return self.generate_plot(data, f"Space {position_index + 1}", color, figsize)
 
 

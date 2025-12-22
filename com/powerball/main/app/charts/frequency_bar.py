@@ -4,19 +4,26 @@ from com.powerball.main.utility.dashboard_utilities import render_chart_in_colum
 
 
 class FrequencyChartGenerator(LotteryChartBase):
-    def __init__(self, data, start_date=None, end_date=None, chart_name="Chart"):
-        # --- FIX: Initialize lists BEFORE calling parent constructor ---
+    def __init__(self, df_data, start_date=None, end_date=None, chart_name="Chart"):
         self.main_numbers = []
         self.special_numbers = []
+        super().__init__(df_data, start_date, end_date, chart_name)
 
-        # Now call parent, which triggers process_data() -> extract_numbers()
-        super().__init__(data, start_date, end_date, chart_name)
+    def extract_numbers_from_df(self):
+        """
+        OPTIMIZED: Grab columns directly.
+        Pandas 'melt' or 'stack' is faster than loops.
+        """
+        if self.filtered_df.empty:
+            return
 
-    def extract_numbers(self, numbers):
-        # 0-4 are Main, 5 is Powerball
-        if len(numbers) >= 6:
-            self.main_numbers.extend(numbers[:5])
-            self.special_numbers.append(numbers[5])
+        # 1. Main Numbers: Columns n1 through n5
+        # We flatten them into a single list
+        main_cols = ['n1', 'n2', 'n3', 'n4', 'n5']
+        self.main_numbers = self.filtered_df[main_cols].values.flatten().tolist()
+
+        # 2. Powerball: Column pb
+        self.special_numbers = self.filtered_df['pb'].tolist()
 
     def plot(self, plot_type='main', figsize=(6, 4)):
         if plot_type == 'main':
