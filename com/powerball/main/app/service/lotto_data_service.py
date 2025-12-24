@@ -1,5 +1,6 @@
 import logging
 import pandas as pd
+import streamlit as st  # <--- Added Import
 from datetime import datetime, timedelta
 from com.powerball.main.rest.lotto_net import LottoNetAPI
 from com.powerball.main.utility.common_utilities import CommonUtilities
@@ -30,6 +31,7 @@ class LottoDataService:
         return now.year
 
     @classmethod
+    @st.cache_data(ttl=3600)  # Cache for 1 hour
     def fetch_all_historical_results(cls) -> pd.DataFrame:
         all_draws = []
         start_year = cls._get_latest_draw_year()

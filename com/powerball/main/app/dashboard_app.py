@@ -63,9 +63,9 @@ def run_dashboard(input_df):
     col1, col2 = st.columns([0.65, 0.35], gap="large")
 
     with col1:
-        st.altair_chart(chart_main, use_container_width=True)
+        st.altair_chart(chart_main, width="stretch") # Updated per warning
     with col2:
-        st.altair_chart(chart_pb, use_container_width=True)
+        st.altair_chart(chart_pb, width="stretch")   # Updated per warning
 
     st.markdown('<hr style="height:3px;border:none;color:#999;background-color:#999;" />', unsafe_allow_html=True)
 
@@ -77,8 +77,8 @@ def run_dashboard(input_df):
     for i in range(0, 6, 2):
         c1, c2 = st.columns(2, gap="large")
         with c1:
-            st.altair_chart(chart_list[i], use_container_width=True)
+            st.altair_chart(chart_list[i], width="stretch") # Updated per warning
         with c2:
             if i + 1 < len(chart_list):
-                st.altair_chart(chart_list[i + 1], use_container_width=True)
+                st.altair_chart(chart_list[i + 1], width="stretch") # Updated per warning
         st.markdown("---")
