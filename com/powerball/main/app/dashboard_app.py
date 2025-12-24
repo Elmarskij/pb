@@ -1,83 +1,78 @@
 import streamlit as st
-from datetime import datetime
+import logging
+import altair as alt
+import pandas as pd
+from datetime import datetime, date
 from com.powerball.main.utility.common_utilities import CommonUtilities
+from com.powerball.main.app.service.lotto_data_service import LottoDataService
+from com.powerball.main.app.charts.frequency_bar import FrequencyChartGenerator
+from com.powerball.main.app.charts.individual_frequency_bar import IndividualFrequencyChartGenerator
 
-# Import the section renderers
-from com.powerball.main.app.charts.frequency_bar import render_main_section
-from com.powerball.main.app.charts.individual_frequency_bar import render_individual_section
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
 
-def run_dashboard(input_data):
+def run_dashboard(input_df):
     st.set_page_config(page_title="Lottery Dashboard", layout="wide")
+    st.markdown("""<style>.block-container {max_width: 2400px; padding: 2rem;}</style>""", unsafe_allow_html=True)
+    st.title("📊 Real-Time Lottery Dashboard")
 
-    # CSS for max width behavior
-    st.markdown("""
-        <style>
-        .block-container {
-            max_width: 2400px; 
-            padding-left: 2rem; 
-            padding-right: 2rem; 
-            margin: auto;
-        }
-        </style>
-        """, unsafe_allow_html=True)
+    if input_df.empty:
+        st.error("❌ ERROR: Input DataFrame is EMPTY.")
+        return
 
-    st.title("📊 Lottery Frequency Dashboard")
-
-    if input_data.empty:
-        st.error("No data available to display.")
-        st.stop()
-
-    # 1. DETERMINE DATA BOUNDS (Absolute limits based on actual fetched data)
-    # These determine the MIN/MAX of the slider itself.
-    data_min_date = input_data['Date'].min().date()
-    data_max_date = input_data['Date'].max().date()
+    # 1. SETUP DATE RANGE (Min/Max from Data)
+    min_date_data = input_df['Date'].min().date()
+    max_date_data = input_df['Date'].max().date()
 
     # 2. LOAD CONFIG DEFAULTS
-    # These determine the DEFAULT SELECTION handles on the slider.
     try:
-        config_min_str = CommonUtilities.get_from_config("min_date")
-        config_max_str = CommonUtilities.get_from_config("max_date")
+        cfg_min_str = CommonUtilities.get_from_config("min_date")
+        cfg_min_dt = datetime.strptime(cfg_min_str, "%m-%d-%Y").date()
+    except Exception:
+        cfg_min_dt = min_date_data
 
-        config_min = datetime.strptime(config_min_str, "%m-%d-%Y").date()
-        config_max = datetime.strptime(config_max_str, "%m-%d-%Y").date()
-    except Exception as e:
-        st.warning(f"Could not read config dates: {e}. Defaulting to full data range.")
-        config_min, config_max = data_min_date, data_max_date
+    # Ensure config start is within actual data bounds
+    default_start = max(min_date_data, cfg_min_dt)
+    if default_start > max_date_data:
+        default_start = min_date_data
 
-    # 3. SIDEBAR (Global Settings)
+    # 3. SIDEBAR SLIDER (Global Filter)
     st.sidebar.header("⚙️ Settings")
-    global_override = st.sidebar.checkbox("Override All Date Filters", value=True)
+    st.sidebar.write("### Filter Data Range")
 
-    # Logic: Default to Config, but clamp to Data Range.
-    # If Config Max is in the future (e.g., 2026), it clamps to Data Max (Today/Latest Draw).
-    default_start = max(data_min_date, config_min)
-    default_end = min(data_max_date, config_max)
+    # This slider returns actual Python Date objects
+    start_date, end_date = st.sidebar.slider(
+        "Select Date Range",
+        min_value=min_date_data,
+        max_value=max_date_data,
+        value=(default_start, max_date_data),
+        format="MM/DD/YYYY"
+    )
 
-    # Safety: If clamping caused start > end, reset to full range
-    if default_start > default_end:
-        default_start, default_end = data_min_date, data_max_date
+    # 4. FILTER DATA (Server-Side)
+    # We filter the dataframe HERE. This ensures the charts receive only valid data.
+    # This solves the "Infinite extent" error completely.
+    mask = (input_df['Date'].dt.date >= start_date) & (input_df['Date'].dt.date <= end_date)
+    filtered_df = input_df.loc[mask]
 
-    global_start, global_end = default_start, default_end
+    st.info(f"Showing results from **{start_date}** to **{end_date}** ({len(filtered_df)} draws)")
 
-    if global_override:
-        st.sidebar.write("Global range active:")
-        # Slider allows full range (data_min/max) but starts at default_start/end
-        global_start, global_end = st.sidebar.slider(
-            "Select Global Range",
-            min_value=data_min_date,
-            max_value=data_max_date,
-            value=(default_start, default_end)
-        )
+    # 5. BUILD SECTIONS (Using Filtered Data)
+    # We don't pass a slider param anymore, just the data.
+    gen_main = FrequencyChartGenerator(filtered_df)
+    chart_main = gen_main.build_section()
 
-    # Pack global state
-    global_state = (global_override, global_start, global_end)
+    gen_ind = IndividualFrequencyChartGenerator(filtered_df)
+    chart_ind = gen_ind.build_section()
 
-    # 4. RENDER SECTIONS
-    # A. Render Main & Powerball Section
-    render_main_section(input_data, data_min_date, data_max_date, global_state)
+    # 6. COMBINE & RENDER
+    final_dashboard = alt.vconcat(
+        chart_main,
+        chart_ind
+    ).resolve_scale(
+        color='independent'
+    ).configure_view(
+        stroke=None
+    )
 
-    st.markdown("---")
-
-    # B. Render Individual Numbers Section
-    render_individual_section(input_data, data_min_date, data_max_date, global_state)
+    st.altair_chart(final_dashboard, use_container_width=True)

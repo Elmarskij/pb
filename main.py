@@ -32,7 +32,8 @@ def main():
     # 1. Business Action: Get Data (Cached)
     historical_data = get_cached_historical_data()
 
-    logging.info(f"Data ready for {len(historical_data)} years.")
+    logging.info(f"Data ready for {len(historical_data)} games.")
+    logging.info(f"historical_data: {historical_data}")
 
     # 2. Business Action: Run Dashboard
     run_dashboard(historical_data)
