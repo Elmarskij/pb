@@ -18,24 +18,15 @@ class IndividualFrequencyChartGenerator(LotteryChartBase):
     def build_section(self):
         colors = ['#d62728', '#ff7f0e', '#ffd700', '#2ca02c', '#1f77b4', '#9467bd']
 
-        rows = []
-        for i in range(0, 6, 2):
-            c1 = self.get_base_chart(
-                self.long_data[i], f"Space {i + 1}", colors[i]
+        # We return a LIST of 6 separate charts.
+        # Layout is handled by st.columns(2) loop in dashboard_app.py
+        chart_list = []
+
+        for i in range(6):
+            title = f"Space {i + 1}"
+            chart = self.get_base_chart(
+                self.long_data[i], title, colors[i]
             )
+            chart_list.append(chart)
 
-            if i + 1 < 6:
-                c2 = self.get_base_chart(
-                    self.long_data[i + 1], f"Space {i + 2}", colors[i + 1]
-                )
-                row = alt.hconcat(c1, c2).resolve_scale(y='shared')
-            else:
-                row = c1
-
-            rows.append(row)
-
-        final_grid = alt.vconcat(*rows).properties(
-            title="Individual Position Frequency"
-        )
-
-        return final_grid
+        return chart_list

@@ -8,16 +8,14 @@ class FrequencyChartGenerator(LotteryChartBase):
         if self.df_data.empty:
             return {'main': pd.DataFrame(), 'special': pd.DataFrame()}
 
-        # 1. Main Numbers
         main_cols = ['n1', 'n2', 'n3', 'n4', 'n5']
 
         df_main = self.df_data.melt(
-            id_vars=[],  # No ID vars needed for simple count
+            id_vars=[],
             value_vars=main_cols,
             value_name='Number'
         ).drop(columns=['variable'])
 
-        # 2. Powerball
         df_special = self.df_data[['pb']].rename(columns={'pb': 'Number'})
 
         return {'main': df_main, 'special': df_special}
@@ -30,13 +28,4 @@ class FrequencyChartGenerator(LotteryChartBase):
             self.long_data['special'], "Powerball", '#FA8072'
         )
 
-        combined = alt.hconcat(
-            chart_main,
-            chart_pb
-        ).resolve_scale(
-            y='shared'
-        ).properties(
-            title="Main & Powerball Frequency"
-        )
-
-        return combined
+        return chart_main, chart_pb

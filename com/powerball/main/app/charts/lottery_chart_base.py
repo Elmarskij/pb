@@ -15,6 +15,8 @@ class LotteryChartBase:
     def get_base_chart(self, source_df, title, color_hex):
         """
         Creates a single Altair Bar Chart.
+        FIX: Added fixed 'width=450'. This stabilizes the layout and prevents
+        the charts from collapsing to 0 pixels or resizing endlessly.
         """
         chart = alt.Chart(source_df).mark_bar(
             color=color_hex,
@@ -26,8 +28,8 @@ class LotteryChartBase:
             tooltip=['Number', 'count()']
         ).properties(
             title=title,
-            height=200,
-            width='container'
+            height=600,
+            width=450  # Fixed width ensures visibility
         )
 
         return chart
