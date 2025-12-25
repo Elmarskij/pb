@@ -12,11 +12,9 @@ class LotteryChartBase:
         """Child classes must implement this to return a DataFrame optimized for Altair."""
         raise NotImplementedError
 
-    def get_base_chart(self, source_df, title, color_hex):
+    def get_base_chart(self, source_df, title, color_hex, date_param):
         """
-        Creates a single Altair Bar Chart.
-        FIX: Added fixed 'width=450'. This stabilizes the layout and prevents
-        the charts from collapsing to 0 pixels or resizing endlessly.
+        Creates a single Altair Bar Chart with Real-Time Filtering.
         """
         chart = alt.Chart(source_df).mark_bar(
             color=color_hex,
@@ -28,8 +26,14 @@ class LotteryChartBase:
             tooltip=['Number', 'count()']
         ).properties(
             title=title,
-            height=600,
-            width=450  # Fixed width ensures visibility
+            height=400,  # Fixed Height 400px
+            width=450,   # Fixed Width
+            background='#F9F9F9'
+        ).add_params(
+            date_param   # Bind the slider to this chart
+        ).transform_filter(
+            # REAL-TIME FILTER: Filter based on Day Integer
+            alt.datum.ts_days >= date_param
         )
 
         return chart

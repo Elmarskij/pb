@@ -1,6 +1,6 @@
 import logging
 import pandas as pd
-import streamlit as st  # <--- Added Import
+import streamlit as st
 from datetime import datetime, timedelta
 from com.powerball.main.rest.lotto_net import LottoNetAPI
 from com.powerball.main.utility.common_utilities import CommonUtilities
@@ -58,12 +58,18 @@ class LottoDataService:
         if not df.empty:
             df = df.sort_values(by='Date', ascending=False)
 
-            # Filter out future dates (garbage data protection)
+            # Filter out future dates
             df = df[df['Date'] <= datetime.now()]
 
             # Ensure proper datetime format
             if not pd.api.types.is_datetime64_any_dtype(df['Date']):
                 df['Date'] = pd.to_datetime(df['Date'])
+
+            # --- ROBUST REAL-TIME FIX ---
+            # Create a simple integer Day Index (Days since 1970).
+            # This is timezone-proof and works perfectly with real-time sliders.
+            df['ts_days'] = (df['Date'] - pd.Timestamp("1970-01-01")) // pd.Timedelta('1D')
+            df['ts_days'] = df['ts_days'].astype(int)
 
         logging.info(f"Converted {len(df)} rows into DataFrame.")
         return df

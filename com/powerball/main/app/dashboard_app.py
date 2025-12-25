@@ -20,65 +20,69 @@ def run_dashboard(input_df):
         st.error("❌ ERROR: Input DataFrame is EMPTY.")
         return
 
-    # 1. SETUP DATE RANGE
-    min_date_data = input_df['Date'].min().date()
-    max_date_data = input_df['Date'].max().date()
-
-    # 2. LOAD CONFIG DEFAULTS
-    try:
-        cfg_min_str = CommonUtilities.get_from_config("min_date")
-        cfg_min_dt = datetime.strptime(cfg_min_str, "%m-%d-%Y").date()
-    except Exception:
-        cfg_min_dt = min_date_data
-
-    default_start = max(min_date_data, cfg_min_dt)
-    if default_start > max_date_data:
-        default_start = min_date_data
-
-    # 3. SIDEBAR SLIDER (Global Filter)
-    st.sidebar.header("⚙️ Settings")
-    st.sidebar.write("### Filter Data Range")
-
-    start_date, end_date = st.sidebar.slider(
-        "Select Date Range",
-        min_value=min_date_data,
-        max_value=max_date_data,
-        value=(default_start, max_date_data),
-        format="MM/DD/YYYY"
-    )
-
-    # 4. FILTER DATA (Server-Side)
-    mask = (input_df['Date'].dt.date >= start_date) & (input_df['Date'].dt.date <= end_date)
-    filtered_df = input_df.loc[mask]
-
-    if filtered_df.empty:
-        st.warning("No draws found in this date range.")
+    if 'ts_days' not in input_df.columns:
+        st.error("❌ ERROR: ts_days column missing. Clear cache and reload.")
+        st.cache_data.clear()
         return
 
-    # 5. BUILD SECTIONS
+    # 1. CALCULATE BOUNDS (Integer Days)
+    min_days = int(input_df['ts_days'].min())
+    max_days = int(input_df['ts_days'].max())
+
+    # 2. CONFIG DEFAULT
+    try:
+        cfg_min_str = CommonUtilities.get_from_config("min_date")
+        cfg_min_dt = datetime.strptime(cfg_min_str, "%m-%d-%Y")
+        start_days_config = (cfg_min_dt - datetime(1970, 1, 1)).days
+    except Exception:
+        start_days_config = min_days
+
+    default_start = max(min_days, start_days_config)
+    if default_start > max_days:
+        default_start = min_days
+
+    st.sidebar.info("ℹ️ Charts now update **instantly** as you drag the slider below the charts.")
+
+    # 3. CREATE ALTAIR PARAM (Client-Side Slider)
+    # This slider lives inside the chart logic, not Streamlit.
+    slider = alt.binding_range(
+        min=min_days,
+        max=max_days,
+        step=1,
+        name='Start Day (Epoch): '
+    )
+
+    date_param = alt.param(
+        name='date_filter',
+        value=default_start,
+        bind=slider
+    )
+
+    # 4. BUILD SECTIONS (Pass the Param, not filtered data)
+    # We pass the FULL dataset. Filtering happens in the browser.
+
     # --- Section 1: Main (65%) & Powerball (35%) ---
-    gen_main = FrequencyChartGenerator(filtered_df)
-    chart_main, chart_pb = gen_main.build_section()
+    gen_main = FrequencyChartGenerator(input_df)
+    chart_main, chart_pb = gen_main.build_section(date_param)
 
     col1, col2 = st.columns([0.65, 0.35], gap="large")
 
     with col1:
-        st.altair_chart(chart_main, width="stretch") # Updated per warning
+        st.altair_chart(chart_main, width="stretch")
     with col2:
-        st.altair_chart(chart_pb, width="stretch")   # Updated per warning
+        st.altair_chart(chart_pb, width="stretch")
 
     st.markdown('<hr style="height:3px;border:none;color:#999;background-color:#999;" />', unsafe_allow_html=True)
 
     # --- Section 2: Individual Positions (Grid) ---
-    gen_ind = IndividualFrequencyChartGenerator(filtered_df)
-    chart_list = gen_ind.build_section()
+    gen_ind = IndividualFrequencyChartGenerator(input_df)
+    chart_list = gen_ind.build_section(date_param)
 
-    # Create 3 rows of 2 columns
     for i in range(0, 6, 2):
         c1, c2 = st.columns(2, gap="large")
         with c1:
-            st.altair_chart(chart_list[i], width="stretch") # Updated per warning
+            st.altair_chart(chart_list[i], width="stretch")
         with c2:
             if i + 1 < len(chart_list):
-                st.altair_chart(chart_list[i + 1], width="stretch") # Updated per warning
+                st.altair_chart(chart_list[i + 1], width="stretch")
         st.markdown("---")
