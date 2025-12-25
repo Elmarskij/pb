@@ -1,58 +1,33 @@
-import streamlit as st
+import pandas as pd
+import altair as alt
 from com.powerball.main.app.charts.lottery_chart_base import LotteryChartBase
-from com.powerball.main.utility.dashboard_utilities import render_chart_in_column
 
 
 class FrequencyChartGenerator(LotteryChartBase):
-    def __init__(self, data, start_date=None, end_date=None, chart_name="Chart"):
-        # --- FIX: Initialize lists BEFORE calling parent constructor ---
-        self.main_numbers = []
-        self.special_numbers = []
+    def prepare_altair_data(self):
+        if self.df_data.empty:
+            return {'main': pd.DataFrame(), 'special': pd.DataFrame()}
 
-        # Now call parent, which triggers process_data() -> extract_numbers()
-        super().__init__(data, start_date, end_date, chart_name)
+        # Keep ts_days for filtering
+        main_cols = ['ts_days', 'n1', 'n2', 'n3', 'n4', 'n5']
 
-    def extract_numbers(self, numbers):
-        # 0-4 are Main, 5 is Powerball
-        if len(numbers) >= 6:
-            self.main_numbers.extend(numbers[:5])
-            self.special_numbers.append(numbers[5])
+        df_main = self.df_data[main_cols].melt(
+            id_vars=['ts_days'], # Preserve ID for filter
+            value_vars=['n1', 'n2', 'n3', 'n4', 'n5'],
+            value_name='Number'
+        ).drop(columns=['variable'])
 
-    def plot(self, plot_type='main', figsize=(6, 4)):
-        if plot_type == 'main':
-            return self.generate_plot(self.main_numbers, "Main", 'skyblue', figsize)
-        else:
-            return self.generate_plot(self.special_numbers, "Powerball", 'salmon', figsize)
+        # Keep ts_days for filtering
+        df_special = self.df_data[['ts_days', 'pb']].rename(columns={'pb': 'Number'})
 
+        return {'main': df_main, 'special': df_special}
 
-# --- EXPOSED RENDER FUNCTION ---
-def render_main_section(input_data, min_d, max_d, global_state):
-    """
-    Renders the top section (Main Numbers + Powerball).
-    """
-    st.header("Main & Powerball Frequency")
-    col1, col2 = st.columns([0.6, 0.4])
+    def build_section(self, date_param):
+        chart_main = self.get_base_chart(
+            self.long_data['main'], "Main Numbers", '#87CEEB', date_param
+        )
+        chart_pb = self.get_base_chart(
+            self.long_data['special'], "Powerball", '#FA8072', date_param
+        )
 
-    # Column 1: Main Numbers
-    render_chart_in_column(
-        column_obj=col1,
-        title="Main Numbers",
-        data=input_data,
-        GeneratorClass=FrequencyChartGenerator,
-        min_d=min_d, max_d=max_d,
-        global_state=global_state,
-        figsize=(9, 3.5),  # Wider figure for 60% column
-        plot_kwargs={'plot_type': 'main'}
-    )
-
-    # Column 2: Powerball
-    render_chart_in_column(
-        column_obj=col2,
-        title="Powerball",
-        data=input_data,
-        GeneratorClass=FrequencyChartGenerator,
-        min_d=min_d, max_d=max_d,
-        global_state=global_state,
-        figsize=(6, 3.5),  # Normal figure for 40% column
-        plot_kwargs={'plot_type': 'special'}
-    )
+        return chart_main, chart_pb

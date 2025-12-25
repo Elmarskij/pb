@@ -1,60 +1,88 @@
 import streamlit as st
-from datetime import datetime
+import logging
+import altair as alt
+import pandas as pd
+from datetime import datetime, date
 from com.powerball.main.utility.common_utilities import CommonUtilities
+from com.powerball.main.app.service.lotto_data_service import LottoDataService
+from com.powerball.main.app.charts.frequency_bar import FrequencyChartGenerator
+from com.powerball.main.app.charts.individual_frequency_bar import IndividualFrequencyChartGenerator
 
-# Import the section renderers
-from com.powerball.main.app.charts.frequency_bar import render_main_section
-from com.powerball.main.app.charts.individual_frequency_bar import render_individual_section
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
 
-def run_dashboard(input_data):
+def run_dashboard(input_df):
     st.set_page_config(page_title="Lottery Dashboard", layout="wide")
+    st.markdown("""<style>.block-container {max_width: 2400px; padding: 2rem;}</style>""", unsafe_allow_html=True)
+    st.title("📊 Real-Time Lottery Dashboard")
 
-    # CSS for max width behavior
-    st.markdown("""
-        <style>
-        .block-container {
-            max_width: 2400px; 
-            padding-left: 2rem; 
-            padding-right: 2rem; 
-            margin: auto;
-        }
-        </style>
-        """, unsafe_allow_html=True)
+    if input_df.empty:
+        st.error("❌ ERROR: Input DataFrame is EMPTY.")
+        return
 
-    st.title("📊 Lottery Frequency Dashboard")
+    if 'ts_days' not in input_df.columns:
+        st.error("❌ ERROR: ts_days column missing. Clear cache and reload.")
+        st.cache_data.clear()
+        return
 
-    # 1. LOAD CONFIG
+    # 1. CALCULATE BOUNDS (Integer Days)
+    min_days = int(input_df['ts_days'].min())
+    max_days = int(input_df['ts_days'].max())
+
+    # 2. CONFIG DEFAULT
     try:
-        min_date = datetime.strptime(CommonUtilities.get_from_config("min_date"), "%m-%d-%Y").date()
-        max_date = datetime.strptime(CommonUtilities.get_from_config("max_date"), "%m-%d-%Y").date()
-    except Exception as e:
-        st.error(f"Error reading config: {e}")
-        st.stop()
+        cfg_min_str = CommonUtilities.get_from_config("min_date")
+        cfg_min_dt = datetime.strptime(cfg_min_str, "%m-%d-%Y")
+        start_days_config = (cfg_min_dt - datetime(1970, 1, 1)).days
+    except Exception:
+        start_days_config = min_days
 
-    # 2. SIDEBAR (Global Settings)
-    st.sidebar.header("⚙️ Settings")
-    global_override = st.sidebar.checkbox("Override All Date Filters", value=True)
+    default_start = max(min_days, start_days_config)
+    if default_start > max_days:
+        default_start = min_days
 
-    global_start, global_end = min_date, max_date
-    if global_override:
-        st.sidebar.write("Global range active:")
-        global_start, global_end = st.sidebar.slider(
-            "Select Global Range",
-            min_value=min_date,
-            max_value=max_date,
-            value=(min_date, max_date)
-        )
+    st.sidebar.info("ℹ️ Charts now update **instantly** as you drag the slider below the charts.")
 
-    # Pack global state into a tuple to pass down to utility functions
-    global_state = (global_override, global_start, global_end)
+    # 3. CREATE ALTAIR PARAM (Client-Side Slider)
+    # This slider lives inside the chart logic, not Streamlit.
+    slider = alt.binding_range(
+        min=min_days,
+        max=max_days,
+        step=1,
+        name='Start Day (Epoch): '
+    )
 
-    # 3. RENDER SECTIONS
+    date_param = alt.param(
+        name='date_filter',
+        value=default_start,
+        bind=slider
+    )
 
-    # A. Render Main & Powerball Section
-    render_main_section(input_data, min_date, max_date, global_state)
+    # 4. BUILD SECTIONS (Pass the Param, not filtered data)
+    # We pass the FULL dataset. Filtering happens in the browser.
 
-    st.markdown("---")
+    # --- Section 1: Main (65%) & Powerball (35%) ---
+    gen_main = FrequencyChartGenerator(input_df)
+    chart_main, chart_pb = gen_main.build_section(date_param)
 
-    # B. Render Individual Numbers Section
-    render_individual_section(input_data, min_date, max_date, global_state)
+    col1, col2 = st.columns([0.65, 0.35], gap="large")
+
+    with col1:
+        st.altair_chart(chart_main, width="stretch")
+    with col2:
+        st.altair_chart(chart_pb, width="stretch")
+
+    st.markdown('<hr style="height:3px;border:none;color:#999;background-color:#999;" />', unsafe_allow_html=True)
+
+    # --- Section 2: Individual Positions (Grid) ---
+    gen_ind = IndividualFrequencyChartGenerator(input_df)
+    chart_list = gen_ind.build_section(date_param)
+
+    for i in range(0, 6, 2):
+        c1, c2 = st.columns(2, gap="large")
+        with c1:
+            st.altair_chart(chart_list[i], width="stretch")
+        with c2:
+            if i + 1 < len(chart_list):
+                st.altair_chart(chart_list[i + 1], width="stretch")
+        st.markdown("---")
