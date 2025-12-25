@@ -25,10 +25,19 @@ class LotteryChartBase:
             y=alt.Y('count()', title=None),
             tooltip=['Number', 'count()']
         ).properties(
-            title=title,
+            title=alt.TitleParams(
+                title,
+                color='#000000',
+                fontSize=20,
+                anchor='middle',
+                fontWeight='bold'
+            ),
             height=400,  # Fixed Height 400px
             width=450,   # Fixed Width
-            background='#F9F9F9'
+            background='#dbd9d9'
+        ).configure_axis(
+            labelColor='black',    # Set X and Y value colors
+            titleColor='black',    # Set X and Y title colors
         ).add_params(
             date_param   # Bind the slider to this chart
         ).transform_filter(
